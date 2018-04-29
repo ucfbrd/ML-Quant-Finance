@@ -415,7 +415,7 @@ def backtest(prices, predictions, initial_weights):
             new_weight = rebalance_y(3,previous_returns,mu=predicted_return.tolist(),x0=prev_weight,w=1,gamma=0.5)
         else:
             new_weight = rebalance_y(3,previous_returns,mu=predicted_return.tolist(),x0=prev_weight,w=0,gamma=0.5)
-        period_return = np.log((new_weight*prices[:,length_past+i+1])/(prev_weight*prices[:,length_past+i]))
+        period_return = new_weight*np.log(prices[:,length_past+i+1]/prices[:,length_past+i])
         portfolio_return.append(np.sum(period_return))
         prev_weight = new_weight
     return portfolio_return
@@ -424,7 +424,7 @@ def backtest(prices, predictions, initial_weights):
 
 x = backtest(dq.T, predictcur, np.repeat(1/10,10))
 
-np.plot(x)
+
 
 
 
