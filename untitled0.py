@@ -15,7 +15,6 @@ from pandas import datetime
 import math, time
 import itertools
 from sklearn import preprocessing
-import datetime
 from sklearn.metrics import mean_squared_error
 from math import sqrt
 from keras.models import Sequential
@@ -29,8 +28,12 @@ from statistics import mean
 from keras import backend as K
 from keras.layers.convolutional import Convolution1D, MaxPooling1D
 from keras.layers.core import Flatten
+<<<<<<< HEAD
+from mosek.fusion import *
+=======
 import pylab
 import random
+>>>>>>> c7e02226bde6fabcad0801e22db8b3288eb8d836
 
 seq_len = 22
 shape = [seq_len, 9, 1]
