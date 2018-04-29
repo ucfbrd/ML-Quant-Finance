@@ -419,7 +419,7 @@ def backtest(prices, predictions, initial_weights):
         portfolio_return.append(np.sum(period_return))
         prev_weight = new_weight
     return portfolio_return
-        
+
 
 
 x = backtest(dq.T, predictcur, np.repeat(1/10,10))
