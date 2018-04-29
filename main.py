@@ -39,8 +39,8 @@ neurons = [256, 256, 32, 1]
 dropout = 0.3
 decay = 0.5
 epochs = 90
-os.chdir("/Users/youssefberrada/Dropbox (MIT)/15.961 Independant Study/Data")
-#os.chdir("/Users/michelcassard/Dropbox (MIT)/15.960 Independant Study/Data")
+#os.chdir("/Users/youssefberrada/Dropbox (MIT)/15.961 Independant Study/Data")
+os.chdir("/Users/michelcassard/Dropbox (MIT)/15.960 Independant Study/Data")
 file = 'FX-5.xlsx'
 # Load spreadsheet
 xl = pd.ExcelFile(file)
