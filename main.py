@@ -382,7 +382,7 @@ def MarkowitzWithTransactionsCost(n,mu,GT,x0,w,gamma,f,g):
 
 
 def rebalance(n,previous_prices,x0,w,mu,gamma=1):
-    GT=np.cov(previous_prices.T)
+    GT=np.cov(previous_prices)
     f = n*[0.01]
     g = n*[0.001]
     weights=MarkowitzWithTransactionsCost(n,mu,GT,x0,w,gamma,f,g)
@@ -398,7 +398,7 @@ def log_diff(data):
 
 def backtest(prices, predictions, initial_weights):
     t_prices = len(prices[1,:])
-    t_predictions = len(predictions[1,:])
+    t_predictions = len(predictions[:,1])
     length_past = t_prices - t_predictions
     returns = np.apply_along_axis(log_diff, 1, prices)
     prediction_return = []
@@ -408,21 +408,21 @@ def backtest(prices, predictions, initial_weights):
     portfolio_return = []
     prev_weight = weights
     for i in range(0,t_predictions-1):
-        print(i)
         predicted_return = prediction_return[i]
         previous_return = returns[:,length_past+i]
         previous_returns = returns[:,0:length_past+i]
-        print(i)
-        new_weight = rebalance_y(3,previous_returns,mu=predicted_return.tolist(),x0=prev_weight,w=1,gamma=0.5)
+        if i==0:
+            new_weight = rebalance_y(3,previous_returns,mu=predicted_return.tolist(),x0=prev_weight,w=1,gamma=0.5)
+        else:
+            new_weight = rebalance_y(3,previous_returns,mu=predicted_return.tolist(),x0=prev_weight,w=0,gamma=0.5)
         period_return = np.log((new_weight*prices[:,length_past+i+1])/(prev_weight*prices[:,length_past+i]))
         portfolio_return.append(np.sum(period_return))
         prev_weight = new_weight
-        print(i)
     return portfolio_return
         
 
 
-x = backtest(prices, predictions, initial_weights)
+x = backtest(dq.T, predictcur, np.repeat(1/10,10))
 
 np.plot(x)
 
