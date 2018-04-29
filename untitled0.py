@@ -28,7 +28,12 @@ from statistics import mean
 from keras import backend as K
 from keras.layers.convolutional import Convolution1D, MaxPooling1D
 from keras.layers.core import Flatten
+<<<<<<< HEAD
 from mosek.fusion import *
+=======
+import pylab
+import random
+>>>>>>> c7e02226bde6fabcad0801e22db8b3288eb8d836
 
 seq_len = 22
 shape = [seq_len, 9, 1]
@@ -386,6 +391,58 @@ def rebalance(n,previous_prices,x0,w,mu,gamma=1):
     return weights
 
 rebalance(9,dq,mu=predictcur[1],x0=[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],w=1,gamma=1)
+
+
+# Backtesting using rebalancing function for weights
+random.seed(1)
+prices = np.array([random.gauss(100, 1) for _ in range(11*300)])
+prices = np.reshape(prices,(11,300))
+predictions = np.array([random.gauss(100, 1) for _ in range(11*100)])
+predictions = np.reshape(predictions,(11,100))
+initial_weights = np.repeat(1/11,11)
+
+def log_diff(data):
+    return np.diff(np.log(data))
+
+t_prices = len(prices[1,:])
+t_predictions = len(predictions[1,:])
+length_past = t_prices - t_predictions
+prediction_return = []
+for k in range(t_predictions):
+    prediction_return.append(np.log(predictions[:,k]/prices[:,length_past+k]))
+prediction_return = np.asarray(prediction_return).T
+
+
+
+def backtest(prices, predictions, initial_weights):
+    t_prices = len(prices[1,:])
+    t_predictions = len(predictions[1,:])
+    length_past = t_prices - t_predictions
+    returns = np.apply_along_axis(log_diff, 1, prices)
+    prediction_return = []
+    for k in range(t_predictions):
+        prediction_return.append(np.log(predictions[:,k]/prices[:,length_past+k]))
+    prediction_return = np.asarray(prediction_return).T
+    weights = initial_weights
+    portfolio_return = []
+    for i in range(0,t_predictions-1):
+        predicted_price = predictions[:,i]
+        previous_price = prices[:,length_past+i]
+        previous_prices = prices[:,0:length_past+i]
+        prev_weight = weights
+        #fn(....)
+        new_weight = weights
+        # period_return = np.log((new_weight*prices[:,length_past+i+1])/(prev_weight*prices[:,length_past+i]))
+        portfolio_return.append(np.sum(period_return))
+        prev_weight = new_weight
+    return portfolio_return
+        
+
+
+x = backtest(prices, predictions, initial_weights)
+
+np.plot(x)
+
 
 
 def plot_result(stock_name, normalized_value_p, normalized_value_y_test):
