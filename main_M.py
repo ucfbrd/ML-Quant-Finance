@@ -388,6 +388,7 @@ def rebalance(n,previous_prices,x0,w,mu,gamma=1):
     weights=MarkowitzWithTransactionsCost(n,mu,GT,x0,w,gamma,f,g)
     return weights
 
+
 rebalance(9,dq,mu=predictcur[1],x0=[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],w=1,gamma=1)
 
 
@@ -440,4 +441,3 @@ def plot_result(stock_name, normalized_value_p, normalized_value_y_test):
     plt2.show()
 
 plot_result("GBP Curncy", p, y_test)
-å
