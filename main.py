@@ -401,3 +401,4 @@ def plot_result(stock_name, normalized_value_p, normalized_value_y_test):
     plt2.ylabel('Price')
     plt2.show()
 
+
