@@ -107,21 +107,23 @@ def load_data(stock,normalize,seq_len,split,ma):
     if normalize:
         #Training
         min_max_scaler = preprocessing.MinMaxScaler()
-        df_train['Open'] = min_max_scaler.fit_transform(df_train['Adj Close'].values.reshape(-1,1))
-        df_train['High'] = min_max_scaler.fit_transform(df_train['Adj Close'].values.reshape(-1,1))
-        df_train['Low'] = min_max_scaler.fit_transform(df_train['Adj Close'].values.reshape(-1,1))
+        min_max_scaler.fit(df_train['Adj Close'].values.reshape(-1,1))
+        df_train['Open'] = min_max_scaler.transform(df_train['Open'].values.reshape(-1,1))
+        df_train['High'] = min_max_scaler.transform(df_train['High'].values.reshape(-1,1))
+        df_train['Low'] = min_max_scaler.transform(df_train['Low'].values.reshape(-1,1))
+        df_train['Adj Close'] = min_max_scaler.transform(df_train['Adj Close'].values.reshape(-1,1))
         df_train['Volume'] = min_max_scaler.fit_transform(df_train.Volume.values.reshape(-1,1))
-        df_train['Adj Close'] = min_max_scaler.fit_transform(df_train['Adj Close'].values.reshape(-1,1))
         df_train['Pct'] = min_max_scaler.fit_transform(df_train['Pct'].values.reshape(-1,1))
         if ma != []:
             for moving in ma:
                 df_train['{}ma'.format(moving)] = min_max_scaler.fit_transform(df_train['{}ma'.format(moving)].values.reshape(-1,1))  
         #Test
-        df_test['Open'] = min_max_scaler.fit_transform(df_test['Adj Close'].values.reshape(-1,1))
-        df_test['High'] = min_max_scaler.fit_transform(df_test['Adj Close'].values.reshape(-1,1))
-        df_test['Low'] = min_max_scaler.fit_transform(df_test['Adj Close'].values.reshape(-1,1))
+        min_max_scaler.fit(df_test['Adj Close'].values.reshape(-1,1))
+        df_test['Open'] = min_max_scaler.transform(df_test['Open'].values.reshape(-1,1))
+        df_test['High'] = min_max_scaler.transform(df_test['High'].values.reshape(-1,1))
+        df_test['Low'] = min_max_scaler.transform(df_test['Low'].values.reshape(-1,1))
+        df_test['Adj Close'] = min_max_scaler.transform(df_test['Adj Close'].values.reshape(-1,1))
         df_test['Volume'] = min_max_scaler.fit_transform(df_test.Volume.values.reshape(-1,1))
-        df_test['Adj Close'] = min_max_scaler.fit_transform(df_test['Adj Close'].values.reshape(-1,1))
         df_test['Pct'] = min_max_scaler.fit_transform(df_test['Pct'].values.reshape(-1,1))
         if ma != []:
             for moving in ma:
