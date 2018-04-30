@@ -28,10 +28,12 @@ from statistics import mean
 from keras import backend as K
 from keras.layers.convolutional import Convolution1D, MaxPooling1D
 from keras.layers.core import Flatten
+<<<<<<< HEAD
 from mosek.fusion import *
+=======
 import pylab
 import random
-
+>>>>>>> c7e02226bde6fabcad0801e22db8b3288eb8d836
 
 seq_len = 22
 shape = [seq_len, 9, 1]
@@ -39,8 +41,8 @@ neurons = [256, 256, 32, 1]
 dropout = 0.3
 decay = 0.5
 epochs = 90
-#os.chdir("/Users/youssefberrada/Dropbox (MIT)/15.961 Independant Study/Data")
-os.chdir("/Users/michelcassard/Dropbox (MIT)/15.960 Independant Study/Data")
+os.chdir("/Users/youssefberrada/Dropbox (MIT)/15.961 Independant Study/Data")
+#os.chdir("/Users/michelcassard/Dropbox (MIT)/15.960 Independant Study/Data")
 file = 'FX-5.xlsx'
 # Load spreadsheet
 xl = pd.ExcelFile(file)
@@ -382,7 +384,7 @@ def MarkowitzWithTransactionsCost(n,mu,GT,x0,w,gamma,f,g):
 
 
 def rebalance(n,previous_prices,x0,w,mu,gamma=1):
-    GT=np.cov(previous_prices)
+    GT=np.cov(previous_prices.T)
     f = n*[0.01]
     g = n*[0.001]
     weights=MarkowitzWithTransactionsCost(n,mu,GT,x0,w,gamma,f,g)
@@ -392,39 +394,54 @@ rebalance(9,dq,mu=predictcur[1],x0=[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],w=1,gam
 
 
 # Backtesting using rebalancing function for weights
+random.seed(1)
+prices = np.array([random.gauss(100, 1) for _ in range(11*300)])
+prices = np.reshape(prices,(11,300))
+predictions = np.array([random.gauss(100, 1) for _ in range(11*100)])
+predictions = np.reshape(predictions,(11,100))
+initial_weights = np.repeat(1/11,11)
+
 def log_diff(data):
     return np.diff(np.log(data))
+
+t_prices = len(prices[1,:])
+t_predictions = len(predictions[1,:])
+length_past = t_prices - t_predictions
+prediction_return = []
+for k in range(t_predictions):
+    prediction_return.append(np.log(predictions[:,k]/prices[:,length_past+k]))
+prediction_return = np.asarray(prediction_return).T
+
 
 
 def backtest(prices, predictions, initial_weights):
     t_prices = len(prices[1,:])
-    t_predictions = len(predictions[:,1])
+    t_predictions = len(predictions[1,:])
     length_past = t_prices - t_predictions
     returns = np.apply_along_axis(log_diff, 1, prices)
     prediction_return = []
     for k in range(t_predictions):
-        prediction_return.append(np.log(predictions[k]/prices[:,length_past+k]))
+        prediction_return.append(np.log(predictions[:,k]/prices[:,length_past+k]))
+    prediction_return = np.asarray(prediction_return).T
     weights = initial_weights
     portfolio_return = []
-    prev_weight = weights
     for i in range(0,t_predictions-1):
-        predicted_return = prediction_return[i]
-        previous_return = returns[:,length_past+i]
-        previous_returns = returns[:,0:length_past+i]
-        if i==0:
-            new_weight = rebalance_y(3,previous_returns,mu=predicted_return.tolist(),x0=prev_weight,w=1,gamma=0.5)
-        else:
-            new_weight = rebalance_y(3,previous_returns,mu=predicted_return.tolist(),x0=prev_weight,w=0,gamma=0.5)
-        period_return = new_weight*np.log(prices[:,length_past+i+1]/prices[:,length_past+i])
+        predicted_price = predictions[:,i]
+        previous_price = prices[:,length_past+i]
+        previous_prices = prices[:,0:length_past+i]
+        prev_weight = weights
+        #fn(....)
+        new_weight = weights
+        period_return = np.log((new_weight*prices[:,length_past+i+1])/(prev_weight*prices[:,length_past+i]))
         portfolio_return.append(np.sum(period_return))
         prev_weight = new_weight
     return portfolio_return
 
 
 
-x = backtest(dq.T, predictcur, np.repeat(1/10,10))
+x = backtest(prices, predictions, initial_weights)
 
-
+np.plot(x)
 
 
 
@@ -440,4 +457,3 @@ def plot_result(stock_name, normalized_value_p, normalized_value_y_test):
     plt2.show()
 
 plot_result("GBP Curncy", p, y_test)
-å
