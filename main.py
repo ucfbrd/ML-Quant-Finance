@@ -16,17 +16,19 @@ from keras.models import Sequential
 from keras.layers.core import Dense, Dropout, Activation
 from keras.layers.recurrent import LSTM
 from keras.models import load_model
-import keras
-import h5py
-import os
-from statistics import mean
+from keras.utils import plot_model
 from keras import backend as K
 from keras.layers.convolutional import Convolution1D, MaxPooling1D
 from keras.layers.core import Flatten
+import keras
+import h5py
+import os
+import graphviz
+import pydot
+from statistics import mean
 import matplotlib.pyplot as plt
 from mosek.fusion import *
-import pylab
-import random
+from keras.utils.vis_utils import plot_model
 
 seq_len = 22
 shape = [seq_len, 9, 1]
@@ -34,8 +36,8 @@ neurons = [256, 256, 32, 1]
 dropout = 0.3
 decay = 0.5
 epochs = 90
-#os.chdir("/Users/youssefberrada/Dropbox (MIT)/15.961 Independant Study/Data")
-os.chdir("/Users/michelcassard/Dropbox (MIT)/15.960 Independant Study/Data")
+os.chdir("/Users/youssefberrada/Dropbox (MIT)/15.961 Independant Study/Data")
+#os.chdir("/Users/michelcassard/Dropbox (MIT)/15.960 Independant Study/Data")
 file = 'FX-5.xlsx'
 # Load spreadsheet
 xl = pd.ExcelFile(file)
@@ -43,34 +45,51 @@ close = pd.ExcelFile('close.xlsx')
 df_close=np.array(close.parse(0))
 
 
-def get_stock_data(stock_name, ma=[]):
+def get_stock_data(stock_name, ma=[],bollinger=[],exp_ma=[],ma_conv=[]):
     """
-    Return a dataframe of that stock and normalize all the values.
+    Return a dataframe of that stock and normalize all the values. 
     (Optional: create moving average)
-
+    
     """
     df = xl.parse(stock_name)
     df.drop(['VOLUME'], 1, inplace=True)
     df.set_index('Date', inplace=True)
-
+    
     # Renaming all the columns so that we can use the old version code
     df.rename(columns={'OPEN': 'Open', 'HIGH': 'High', 'LOW': 'Low', 'NUMBER_TICKS': 'Volume', 'LAST_PRICE': 'Adj Close'}, inplace=True)
      # Percentage change
     df['Pct'] = df['Adj Close'].pct_change()
     df.dropna(inplace=True)
-
-    # Moving Average
+    
+    # Moving Average    
     if ma != []:
         for moving in ma:
             df['{}ma'.format(moving)] = df['Adj Close'].rolling(window=moving).mean()
+    # Bollinger   
+    if bollinger != []:
+        for moving in bollinger:
+            df['{}bollinger'.format(moving)] = df['Adj Close'].rolling(window=moving, center=False).mean()
+        
+    # Exponential Moving Average    
+    if exp_ma != []:
+        for moving in exp_ma:
+            df['{}exp_ma'.format(moving)] = df['Adj Close'].ewm(min_periods=moving, adjust=True, span=span, ignore_na=ignore_na).mean()
+   
+    # Moving Average Convergence   
+    if ma_conv!= []:
+        for moving in ma_conv:
+            df['{}ma_conv'.format(moving)] = df['Adj Close'].ewm(min_periods=moving[1], adjust=True, span=span, ignore_na=ignore_na).mean()-df['Adj Close'].ewm(min_periods=moving[2], adjust=True, span=span, ignore_na=ignore_na).mean()
+    
+    
+    
     df.dropna(inplace=True)
-
-
+    
+  
     # Move Adj Close to the rightmost for the ease of training
     adj_close = df['Adj Close']
     df.drop(labels=['Adj Close'], axis=1, inplace=True)
     df = pd.concat([df, adj_close], axis=1)
-
+      
     return df
 
 
@@ -85,7 +104,7 @@ def plot_stock(df):
     plt.show()
 
 
-def load_data(stock,normalize,seq_len,split,ma):
+def load_data(stock,normalize,seq_len,split,ma=[],bollinger=[],exp_ma=[],ma_conv=[]):
     amount_of_features = len(stock.columns)
     print ("Amount of features = {}".format(amount_of_features))
     sequence_length = seq_len+1
@@ -111,6 +130,16 @@ def load_data(stock,normalize,seq_len,split,ma):
         if ma != []:
             for moving in ma:
                 df_train['{}ma'.format(moving)] = min_max_scaler.fit_transform(df_train['{}ma'.format(moving)].values.reshape(-1,1))
+        if bollinger != []:
+            for moving in bollinger:
+                df_train['{}bollinger'.format(moving)] = min_max_scaler.fit_transform(df_train['{}bollinger'.format(moving)].values.reshape(-1,1))
+        if exp_ma != []:
+            for moving in exp_ma:
+                df_train['{}exp_ma'.format(moving)] = min_max_scaler.fit_transform(df_train['{}exp_ma'.format(moving)].values.reshape(-1,1))
+        if ma_conv!= []:
+            for moving in ma_conv:
+                df_train['{}ma_conv'.format(moving)] = min_max_scaler.fit_transform(df_train['{}ma_conv'.format(moving)].values.reshape(-1,1))
+                
         #Test
         min_max_scaler.fit(df_test['Adj Close'].values.reshape(-1,1))
         df_test['Open'] = min_max_scaler.transform(df_test['Open'].values.reshape(-1,1))
@@ -122,7 +151,16 @@ def load_data(stock,normalize,seq_len,split,ma):
         if ma != []:
             for moving in ma:
                 df_test['{}ma'.format(moving)] = min_max_scaler.fit_transform(df_test['{}ma'.format(moving)].values.reshape(-1,1))
-
+        if bollinger != []:
+            for moving in bollinger:
+                df_test['{}bollinger'.format(moving)] = min_max_scaler.fit_transform(df_test['{}bollinger'.format(moving)].values.reshape(-1,1))
+        if exp_ma != []:
+            for moving in exp_ma:
+                df_test['{}exp_ma'.format(moving)] = min_max_scaler.fit_transform(df_test['{}exp_ma'.format(moving)].values.reshape(-1,1))
+        if ma_conv!= []:
+            for moving in ma_conv:
+                df_test['{}ma_conv'.format(moving)] = min_max_scaler.fit_transform(df_test['{}ma_conv'.format(moving)].values.reshape(-1,1))
+                
     #Training
     data_train = df_train.as_matrix()
     for index in range(len(data_train) - sequence_length):
@@ -197,6 +235,8 @@ def build_model_CNN(shape, neurons, dropout, decay):
     return model
 
 model = build_model_CNN(shape, neurons, dropout, decay)
+
+plot_model(model, to_file='model_plot.png', show_shapes=True, show_layer_names=True)
 
 def model_score(model, X_train, y_train, X_test, y_test):
     trainScore = model.evaluate(X_train, y_train, verbose=0)
