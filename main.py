@@ -30,15 +30,15 @@ import matplotlib.pyplot as plt
 from mosek.fusion import *
 from keras.utils.vis_utils import plot_model
 
-seq_len = 22
-shape = [seq_len, 9, 1]
+seq_len = 72
+shape = [seq_len, 19, 1]
 neurons = [256, 256, 32, 1]
 dropout = 0.3
-decay = 0.5
-epochs = 90
+decay = 0.3
+epochs = 50
 os.chdir("/Users/youssefberrada/Dropbox (MIT)/15.961 Independant Study/Data")
 #os.chdir("/Users/michelcassard/Dropbox (MIT)/15.960 Independant Study/Data")
-file = 'FX-5.xlsx'
+file = 'FX-5-merg.xlsx'
 # Load spreadsheet
 xl = pd.ExcelFile(file)
 close = pd.ExcelFile('close.xlsx')
@@ -52,7 +52,7 @@ def get_stock_data(stock_name, ma=[],bollinger=[],exp_ma=[],ma_conv=[]):
     
     """
     df = xl.parse(stock_name)
-    df.drop(['VOLUME'], 1, inplace=True)
+    #df.drop(['VOLUME'], 1, inplace=True)
     df.set_index('Date', inplace=True)
     
     # Renaming all the columns so that we can use the old version code
@@ -67,18 +67,25 @@ def get_stock_data(stock_name, ma=[],bollinger=[],exp_ma=[],ma_conv=[]):
             df['{}ma'.format(moving)] = df['Adj Close'].rolling(window=moving).mean()
     # Bollinger   
     if bollinger != []:
+        def bbands(price, length=30, numsd=2):
+            """ returns average, upper band, and lower band"""
+            ave = pd.stats.moments.rolling_mean(price,length)
+            sd = pd.stats.moments.rolling_std(price,length)
+            upband = ave + (sd*numsd)
+            dnband = ave - (sd*numsd)
+            return np.round(upband,3), np.round(dnband,3)
         for moving in bollinger:
-            df['{}bollinger'.format(moving)] = df['Adj Close'].rolling(window=moving, center=False).mean()
+            df['{}bollingerup'.format(moving)],df['{}bollingerdown'.format(moving)] = bbands(df['Adj Close'], length=moving, numsd=2)
         
     # Exponential Moving Average    
     if exp_ma != []:
         for moving in exp_ma:
-            df['{}exp_ma'.format(moving)] = df['Adj Close'].ewm(min_periods=moving, adjust=True, span=span, ignore_na=ignore_na).mean()
+            df['{}exp_ma'.format(moving)] = df['Adj Close'].ewm(min_periods=1, adjust=True,com=moving).mean()
    
     # Moving Average Convergence   
     if ma_conv!= []:
         for moving in ma_conv:
-            df['{}ma_conv'.format(moving)] = df['Adj Close'].ewm(min_periods=moving[1], adjust=True, span=span, ignore_na=ignore_na).mean()-df['Adj Close'].ewm(min_periods=moving[2], adjust=True, span=span, ignore_na=ignore_na).mean()
+            df['{}ma_conv'.format(moving)] = df['Adj Close'].ewm(min_periods=1, adjust=True,com=moving[0]).mean()-df['Adj Close'].ewm(min_periods=1, adjust=True,com=moving[1]).mean()
     
     
     
@@ -132,7 +139,8 @@ def load_data(stock,normalize,seq_len,split,ma=[],bollinger=[],exp_ma=[],ma_conv
                 df_train['{}ma'.format(moving)] = min_max_scaler.fit_transform(df_train['{}ma'.format(moving)].values.reshape(-1,1))
         if bollinger != []:
             for moving in bollinger:
-                df_train['{}bollinger'.format(moving)] = min_max_scaler.fit_transform(df_train['{}bollinger'.format(moving)].values.reshape(-1,1))
+                df_train['{}bollingerup'.format(moving)] = min_max_scaler.fit_transform(df_train['{}bollingerup'.format(moving)].values.reshape(-1,1))
+                df_train['{}bollingerdown'.format(moving)] = min_max_scaler.fit_transform(df_train['{}bollingerdown'.format(moving)].values.reshape(-1,1))
         if exp_ma != []:
             for moving in exp_ma:
                 df_train['{}exp_ma'.format(moving)] = min_max_scaler.fit_transform(df_train['{}exp_ma'.format(moving)].values.reshape(-1,1))
@@ -153,7 +161,8 @@ def load_data(stock,normalize,seq_len,split,ma=[],bollinger=[],exp_ma=[],ma_conv
                 df_test['{}ma'.format(moving)] = min_max_scaler.fit_transform(df_test['{}ma'.format(moving)].values.reshape(-1,1))
         if bollinger != []:
             for moving in bollinger:
-                df_test['{}bollinger'.format(moving)] = min_max_scaler.fit_transform(df_test['{}bollinger'.format(moving)].values.reshape(-1,1))
+                df_test['{}bollingerup'.format(moving)] = min_max_scaler.fit_transform(df_test['{}bollingerup'.format(moving)].values.reshape(-1,1))
+                df_test['{}bollingerdown'.format(moving)] = min_max_scaler.fit_transform(df_test['{}bollingerdown'.format(moving)].values.reshape(-1,1))
         if exp_ma != []:
             for moving in exp_ma:
                 df_test['{}exp_ma'.format(moving)] = min_max_scaler.fit_transform(df_test['{}exp_ma'.format(moving)].values.reshape(-1,1))
@@ -173,7 +182,7 @@ def load_data(stock,normalize,seq_len,split,ma=[],bollinger=[],exp_ma=[],ma_conv
     data_test = df_test.as_matrix()
     for index in range(len(data_test) - sequence_length):
         result_test.append(data_test[index: index + sequence_length])
-    test = np.array(result_train)
+    test = np.array(result_test)
     X_test = test[:, :-1].copy()
     y_test = test[:, -1][:,-1].copy()
 
@@ -204,7 +213,7 @@ def build_model(shape, neurons, dropout, decay):
 
 def build_model_CNN(shape, neurons, dropout, decay):
     model = Sequential()
-    model.add(Convolution1D(input_shape = (shape[0], shape[1]),
+    model.add(Convolution1D(input_shape = (shape[0], shape[1]), 
                         nb_filter=64,
                         filter_length=2,
                         border_mode='valid',
@@ -212,7 +221,7 @@ def build_model_CNN(shape, neurons, dropout, decay):
                         subsample_length=1))
     model.add(MaxPooling1D(pool_length=2))
 
-    model.add(Convolution1D(input_shape = (shape[0], shape[1]),
+    model.add(Convolution1D(input_shape = (shape[0], shape[1]), 
                         nb_filter=64,
                         filter_length=2,
                         border_mode='valid',
@@ -272,11 +281,14 @@ def plot_result_norm(stock_name, normalized_value_p, normalized_value_y_test):
 
 
 def denormalize(stock_name, normalized_value,split=0.7,predict=True):
-
+    """
+    Return a dataframe of that stock and normalize all the values. 
+    (Optional: create moving average)
+    """
     df = xl.parse(stock_name)
-    df.drop(['VOLUME'], 1, inplace=True)
+    #df.drop(['VOLUME'], 1, inplace=True)
     df.set_index('Date', inplace=True)
-
+    
     # Renaming all the columns so that we can use the old version code
     df.rename(columns={'OPEN': 'Open', 'HIGH': 'High', 'LOW': 'Low', 'NUMBER_TICKS': 'Volume', 'LAST_PRICE': 'Adj Close'}, inplace=True)
 
@@ -284,27 +296,27 @@ def denormalize(stock_name, normalized_value,split=0.7,predict=True):
     df.dropna(inplace=True)
     df = df['Adj Close'].values.reshape(-1,1)
     normalized_value = normalized_value.reshape(-1,1)
-
-    row = round(split * df.shape[0])
+    
+    row = round(split * df.shape[0]) 
     if predict:
         df_p=df[0:row].copy()
     else:
         df_p=df[row:len(df)].copy()
-
+    
     #return df.shape, p.shape
     max_df=np.max(df_p)
     min_df=np.min(df_p)
     new=normalized_value*(max_df-min_df)+min_df
-
+      
     return new
 
-def portfolio(currency_list,file = 'FX-5.xlsx',seq_len = 22,shape = [seq_len, 9, 1],neurons = [256, 256, 32, 1],dropout = 0.3,decay = 0.5,
-              epochs = 90,ma=[50, 100, 200],split=0.7):
+def portfolio(currency_list,file = 'FX-5-merg.xlsx',seq_len = 144,shape = [seq_len, 19, 1],neurons = [256, 256, 32, 1],dropout = 0.3,decay = 0.5,
+              epochs = 90,ma=[50, 100, 200],bollinger=[50, 100, 200],exp_ma=[50, 100, 200],ma_conv=[[26,12]],split=0.7):
     i=0
     mini=99999999
     for currency in currency_list:
-        df=get_stock_data(currency,  ma)
-        X_train, y_train, X_test, y_test = load_data(df,True,seq_len,split,ma)
+        df=get_stock_data(currency, ma,bollinger,exp_ma,ma_conv)
+        X_train, y_train, X_test, y_test = load_data(df,True,seq_len,split,ma,bollinger,exp_ma,ma_conv)
         model = build_model_CNN(shape, neurons, dropout, decay)
         model.fit(X_train,y_train,batch_size=512,epochs=epochs,validation_split=0.3,verbose=1)
         p = percentage_difference(model, X_test, y_test)
@@ -330,8 +342,8 @@ currency_list=[ 'GBP Curncy',
  'CHF Curncy',
  'NOK Curncy',
  'ZAR Curncy']
-predictcur=portfolio(currency_list,file = 'FX-5-merg.xlsx',seq_len = 22,shape = [seq_len, 9, 1],neurons = [256, 256, 32, 1],dropout = 0.3,decay = 0.5,
-              epochs = 90,ma=[50, 100, 200],split=0.7)
+predictcur=portfolio(currency_list,file = 'FX-5-merg.xlsx',seq_len = seq_len,shape = [seq_len, 19, 1],neurons = [256, 256, 32, 1],dropout = 0.2,decay = decay,
+              epochs = 50,ma=[12, 72, 144],bollinger=[12, 72, 144],exp_ma=[12, 72, 144],ma_conv=[[26,12]],split=0.7)
 
 def MarkowitzWithTransactionsCost(n,mu,GT,x0,w,gamma,f,g):
     # Upper bound on the traded amount
@@ -343,9 +355,11 @@ def MarkowitzWithTransactionsCost(n,mu,GT,x0,w,gamma,f,g):
 
         # Defines the variables. No shortselling is allowed.
         x = M.variable("x", n, Domain.greaterThan(0.0))
-
-        # Additional "helper" variables
-        z = M.variable("z", n, Domain.unbounded())
+        #x = M.variable("x", n, Domain.lessThan(0.0))
+        #x = M.variable("x", n, Domain.inRange(-3., 3.))
+        
+        # Additional "helper" variables 
+        z = M.variable("z", n, Domain.unbounded())   
         # Binary variables
         y = M.variable("y", n, Domain.binary())
 
@@ -358,7 +372,7 @@ def MarkowitzWithTransactionsCost(n,mu,GT,x0,w,gamma,f,g):
         # Imposes a bound on the risk
         M.constraint('risk', Expr.vstack( gamma,Expr.mul(GT,x)), Domain.inQCone())
 
-        # z >= |x-x0|
+        # z >= |x-x0| 
         M.constraint('buy', Expr.sub(z,Expr.sub(x,x0)),Domain.greaterThan(0.0))
         M.constraint('sell', Expr.sub(z,Expr.sub(x0,x)),Domain.greaterThan(0.0))
         # Alternatively, formulate the two constraints as
@@ -367,18 +381,17 @@ def MarkowitzWithTransactionsCost(n,mu,GT,x0,w,gamma,f,g):
         # Constraints for turning y off and on. z-diag(u)*y<=0 i.e. z_j <= u_j*y_j
         M.constraint('y_on_off', Expr.sub(z,Expr.mulElm(u,y)), Domain.lessThan(0.0))
 
-        # Integer optimization problems can be very hard to solve so limiting the
+        # Integer optimization problems can be very hard to solve so limiting the 
         # maximum amount of time is a valuable safe guard
-        M.setSolverParam('mioMaxTime', 180.0)
+        M.setSolverParam('mioMaxTime', 10000.0) 
         M.solve()
 
         return (np.dot(mu,x.level()), x.level())
 
-
 def rebalance(n,previous_prices,x0,w,mu,gamma=1):
     GT=np.cov(previous_prices)
-    f = n*[0.01]
-    g = n*[0.001]
+    f = n*[0.00]
+    g = n*[0.005]
     weights=MarkowitzWithTransactionsCost(n,mu,GT,x0,w,gamma,f,g)
     return weights
 
@@ -401,19 +414,20 @@ def backtest(prices, predictions, initial_weights):
     portfolio_return = []
     prev_weight = weights
     for i in range(0,t_predictions-1):
-        print(i)
+    #for i in range(0,1000):
         predicted_return = prediction_return[i]
+        #predicted_return = returns[:,length_past+i-1]
         previous_return = returns[:,length_past+i-1]
         previous_returns = returns[:,0:(length_past+i-1)]
         if i==0:
-            new_weight = rebalance(10,previous_returns,mu=predicted_return.tolist(),x0=prev_weight,w=1,gamma=0.05)
+            new_weight = rebalance(10,previous_returns,mu=predicted_return.tolist(),x0=prev_weight,w=0,gamma=5)
         else:
-            new_weight = rebalance(10,previous_returns,mu=predicted_return.tolist(),x0=prev_weight,w=np.sum(period_return),gamma=0.05)
-        period_return = new_weight*np.log(prices[:,length_past+i]/prices[:,length_past+i-1])
-        port_return=port_return*(1+np.sum(period_return))
+            new_weight = rebalance(10,previous_returns,mu=predicted_return.tolist(),x0=prev_weight,w=0,gamma=5)
+        period_return = np.dot(new_weight,returns[:,length_past+i])
+        port_return=port_return*(1+period_return)
         portfolio_return.append(port_return)
         prev_weight = new_weight
-        print(new_weight)
+        print(period_return)
     return portfolio_return
 
 
